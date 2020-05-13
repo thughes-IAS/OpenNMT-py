@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-import configargparse
-
-from flask import Flask, jsonify, request
-from waitress import serve
-from onmt.translate import TranslationServer, ServerModelError
+# Standard Library
 import logging
 from logging.handlers import RotatingFileHandler
+
+# First Party
+import configargparse
+from flask import Flask, jsonify, request
+from onmt.translate import ServerModelError, TranslationServer
+from waitress import serve
 
 STATUS_OK = "ok"
 STATUS_ERROR = "error"
@@ -20,15 +22,16 @@ def start(config_file,
     def prefix_route(route_function, prefix='', mask='{0}{1}'):
         def newroute(route, *args, **kwargs):
             return route_function(mask.format(prefix, route), *args, **kwargs)
+
         return newroute
 
     if debug:
         logger = logging.getLogger("main")
         log_format = logging.Formatter(
             "[%(asctime)s %(levelname)s] %(message)s")
-        file_handler = RotatingFileHandler(
-            "debug_requests.log",
-            maxBytes=1000000, backupCount=10)
+        file_handler = RotatingFileHandler("debug_requests.log",
+                                           maxBytes=1000000,
+                                           backupCount=10)
         file_handler.setFormatter(log_format)
         logger.addHandler(file_handler)
 
@@ -84,6 +87,52 @@ def start(config_file,
 
         return jsonify(out)
 
+    @app.route('/pagetranslate', methods=['POST'])
+    def pagetranslate():
+
+        inputs = request.get_json(force=True)
+        if debug:
+            logger.info(inputs)
+        out = {}
+        try:
+
+            translation = []
+            source = []
+            
+            trans, _, n_best, _, aligns = translation_server.run(inputs)
+
+            out = [[] for _ in range(n_best)]
+
+            for i in range(len(trans)):
+                response = {
+                    "src": inputs[i // n_best]['src'],
+                    "tgt": trans[i],
+                }
+                if aligns[i][0] is not None:
+                    response["align"] = aligns[i]
+                out[i % n_best].append(response)
+
+                source.append(inputs[i // n_best]['src'])
+                translation.append(trans[i])
+
+            out = {'tgt': '\n'.join(translation)}
+
+
+        except ServerModelError as e:
+            model_id = inputs[0].get("id")
+            if debug:
+                logger.warning("Unload model #{} "
+                               "because of an error".format(model_id))
+            translation_server.models[model_id].unload()
+            out['error'] = str(e)
+            out['status'] = STATUS_ERROR
+        if debug:
+            logger.info(out)
+
+
+        
+        return jsonify(out)
+
     @app.route('/translate', methods=['POST'])
     def translate():
         inputs = request.get_json(force=True)
@@ -100,8 +149,12 @@ def start(config_file,
             out = [[] for _ in range(n_best)]
 
             for i in range(len(trans)):
-                response = {"src": inputs[i // n_best]['src'], "tgt": trans[i],
-                            "n_best": n_best, "pred_score": scores[i]}
+                response = {
+                    "src": inputs[i // n_best]['src'],
+                    "tgt": trans[i],
+                    "n_best": n_best,
+                    "pred_score": scores[i]
+                }
                 if aligns[i][0] is not None:
                     response["align"] = aligns[i]
                 out[i % n_best].append(response)
@@ -144,8 +197,10 @@ def _get_parser():
     parser.add_argument("--port", type=int, default="5000")
     parser.add_argument("--url_root", type=str, default="/translator")
     parser.add_argument("--debug", "-d", action="store_true")
-    parser.add_argument("--threads", "-t", type=int,default=4)
-    parser.add_argument("--config", "-c", type=str,
+    parser.add_argument("--threads", "-t", type=int, default=4)
+    parser.add_argument("--config",
+                        "-c",
+                        type=str,
                         default="./available_models/conf.json")
     return parser
 
@@ -153,7 +208,10 @@ def _get_parser():
 def main():
     parser = _get_parser()
     args = parser.parse_args()
-    start(args.config, url_root=args.url_root, host=args.ip, port=args.port,
+    start(args.config,
+          url_root=args.url_root,
+          host=args.ip,
+          port=args.port,
           debug=args.debug,
           threads=args.threads)
 
