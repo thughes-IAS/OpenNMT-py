@@ -418,13 +418,15 @@ class ServerModel(object):
         self.loading_lock.set()
     
     def process_input(self, raw_input):
-        print('here it is',421,raw_input)
 
-        split_src = re.split('\n',raw_input['src'])
+        split_src = re.split('\.|\n',raw_input['src'])
 
         new_inputs = []
 
         for fragment in split_src:
+
+            if not fragment:
+                continue
 
             new_input = deepcopy(raw_input)
 
