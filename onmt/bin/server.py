@@ -15,6 +15,7 @@ def start(config_file,
           url_root="./translator",
           host="0.0.0.0",
           port=5000,
+          threads=4,
           debug=False):
     def prefix_route(route_function, prefix='', mask='{0}{1}'):
         def newroute(route, *args, **kwargs):
@@ -130,7 +131,7 @@ def start(config_file,
         out['status'] = STATUS_OK
         return jsonify(out)
 
-    serve(app, host=host, port=port)
+    serve(app, host=host, port=port, threads=threads)
 
 
 def _get_parser():
@@ -141,6 +142,7 @@ def _get_parser():
     parser.add_argument("--port", type=int, default="5000")
     parser.add_argument("--url_root", type=str, default="/translator")
     parser.add_argument("--debug", "-d", action="store_true")
+    parser.add_argument("--threads", "-t", type=int,default=4)
     parser.add_argument("--config", "-c", type=str,
                         default="./available_models/conf.json")
     return parser
@@ -150,7 +152,8 @@ def main():
     parser = _get_parser()
     args = parser.parse_args()
     start(args.config, url_root=args.url_root, host=args.ip, port=args.port,
-          debug=args.debug)
+          debug=args.debug,
+          threads=args.threads)
 
 
 if __name__ == "__main__":
