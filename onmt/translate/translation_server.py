@@ -416,9 +416,37 @@ class ServerModel(object):
         self.load_time = timer.tick()
         self.reset_unload_timer()
         self.loading_lock.set()
+    
+    def process_input(self, raw_input):
+        print('here it is',421,raw_input)
+
+        split_src = re.split('\n',raw_input['src'])
+
+        new_inputs = []
+
+        for fragment in split_src:
+
+            new_input = deepcopy(raw_input)
+
+            new_input['src']=fragment
+
+            new_inputs.append(new_input)
+
+
+        return new_inputs
+
+
+    def intercept_inputs(self, raw_inputs):
+
+        processed_inputs = []
+
+        for raw_input in raw_inputs:
+            processed_inputs.extend(self.process_input(raw_input))
+
+        return processed_inputs 
 
     @critical
-    def run(self, inputs):
+    def run(self, raw_inputs):
         """Translate `inputs` using this model
 
         Args:
@@ -457,6 +485,9 @@ class ServerModel(object):
         tail_spaces = []
         sslength = []
         all_preprocessed = []
+
+        inputs = self.intercept_inputs(raw_inputs)
+
         for i, inp in enumerate(inputs):
             src = inp['src']
             whitespaces_before, whitespaces_after = "", ""
@@ -540,7 +571,8 @@ class ServerModel(object):
 
         self.logger.info("Translation Results: %d", len(results))
 
-        return results, scores, self.opt.n_best, timer.times, aligns
+        return results, scores, len(inputs), timer.times, aligns
+        # return results, scores, self.opt.n_best, timer.times, aligns
 
     def rebuild_seg_packages(self, all_preprocessed, results,
                              scores, aligns, n_best):
