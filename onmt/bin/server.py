@@ -97,7 +97,6 @@ def start(config_file,
         try:
 
             translation = []
-            source = []
             
             trans, _, n_best, _, aligns = translation_server.run(inputs)
 
@@ -110,9 +109,7 @@ def start(config_file,
                 }
                 if aligns[i][0] is not None:
                     response["align"] = aligns[i]
-                out[i % n_best].append(response)
 
-                source.append(inputs[i // n_best]['src'])
                 translation.append(trans[i])
 
             out = {'tgt': '\n'.join(translation)}
