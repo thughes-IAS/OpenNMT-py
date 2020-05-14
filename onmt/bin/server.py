@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # Standard Library
+# Standard Library
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -96,23 +97,9 @@ def start(config_file,
         out = {}
         try:
 
-            translation = []
-            
-            trans, _, n_best, _, aligns = translation_server.run(inputs)
+            trans, _, _, _, _ = translation_server.run(inputs)
 
-            out = [[] for _ in range(n_best)]
-
-            for i in range(len(trans)):
-                response = {
-                    "src": inputs[i // n_best]['src'],
-                    "tgt": trans[i],
-                }
-                if aligns[i][0] is not None:
-                    response["align"] = aligns[i]
-
-                translation.append(trans[i])
-
-            out = {'tgt': '\n'.join(translation)}
+            out['tgt'] = '\n'.join(trans)
 
 
         except ServerModelError as e:
@@ -126,8 +113,6 @@ def start(config_file,
         if debug:
             logger.info(out)
 
-
-        
         return jsonify(out)
 
     @app.route('/translate', methods=['POST'])
