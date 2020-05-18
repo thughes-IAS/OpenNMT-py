@@ -1,5 +1,9 @@
 #!/usr/bin/env python
+# Standard Library
+# Standard Library
 import argparse
+
+# First Party
 import torch
 
 
@@ -7,11 +11,10 @@ def get_ctranslate2_model_spec(opt):
     """Creates a CTranslate2 model specification from the model options."""
     with_relative_position = getattr(opt, "max_relative_positions", 0) > 0
     is_ct2_compatible = (
-        opt.encoder_type == "transformer"
-        and opt.decoder_type == "transformer"
+        opt.encoder_type == "transformer" and opt.decoder_type == "transformer"
         and getattr(opt, "self_attn_type", "scaled-dot") == "scaled-dot"
-        and ((opt.position_encoding and not with_relative_position)
-             or (with_relative_position and not opt.position_encoding)))
+        and ((opt.position_encoding and not with_relative_position) or
+             (with_relative_position and not opt.position_encoding)))
     if not is_ct2_compatible:
         return None
     import ctranslate2
@@ -25,24 +28,36 @@ def get_ctranslate2_model_spec(opt):
 def main():
     parser = argparse.ArgumentParser(
         description="Release an OpenNMT-py model for inference")
-    parser.add_argument("--model", "-m",
-                        help="The model path", required=True)
-    parser.add_argument("--output", "-o",
-                        help="The output path", required=True)
+    parser.add_argument("--model", "-m", help="The model path", required=True)
+    parser.add_argument("--output",
+                        "-o",
+                        help="The output path",
+                        required=True)
     parser.add_argument("--format",
                         choices=["pytorch", "ctranslate2"],
                         default="pytorch",
                         help="The format of the released model")
-    parser.add_argument("--quantization", "-q",
+    parser.add_argument("--quantization",
+                        "-q",
                         choices=["int8", "int16"],
                         default=None,
                         help="Quantization type for CT2 model.")
+
+    parser.add_argument('-c',
+                        '--cpu',
+                        action='store_true',
+                        help="Releasing model on CPU rather than GPU.")
     opt = parser.parse_args()
 
-    model = torch.load(opt.model)
+    if opt.cpu:
+        model = torch.load(opt.model, map_location=torch.device('cpu'))
+    else:
+        model = torch.load(opt.model)
+
     if opt.format == "pytorch":
         model["optim"] = None
         torch.save(model, opt.output)
+
     elif opt.format == "ctranslate2":
         model_spec = get_ctranslate2_model_spec(model["opt"])
         if model_spec is None:
@@ -51,7 +66,9 @@ def main():
                              "more information on supported models.")
         import ctranslate2
         converter = ctranslate2.converters.OpenNMTPyConverter(opt.model)
-        converter.convert(opt.output, model_spec, force=True,
+        converter.convert(opt.output,
+                          model_spec,
+                          force=True,
                           quantization=opt.quantization)
 
 
